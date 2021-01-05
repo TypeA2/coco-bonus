@@ -4,10 +4,9 @@
 #include <utility>
 
 // Reference counting GC "algorithm"
-
-namespace gc {
+namespace gc::refcount {
     template <typename T>
-    class refcount_object {
+    class object {
         struct storage {
             std::size_t count{};
             T data;
@@ -15,18 +14,21 @@ namespace gc {
 
         storage* _s = nullptr;
 
-        friend class refcount;
+        friend struct allocator;
 
         // Private constructor for refcount class
-        constexpr refcount_object(storage* s) : _s { s } { }
+        constexpr object(storage* s) : _s { s } { }
 
         public:
+        // Default, empty constructor
+        constexpr object() = default;
+
         // Copy -> increate refcount
-        constexpr refcount_object(const refcount_object& other) : _s { other._s } {
+        constexpr object(const object& other) : _s { other._s } {
             _s->count += 1;
         }
 
-        constexpr refcount_object& operator=(const refcount_object& other) {
+        constexpr object& operator=(const object& other) {
             if (this != &other) {
                 _s = other._s;
                 _s->count += 1;
@@ -36,17 +38,21 @@ namespace gc {
         }
 
         // Move -> keep refcount
-        constexpr refcount_object(refcount_object&& other) noexcept
+        constexpr object(object&& other) noexcept
             : _s { std::exchange(other._s, nullptr) } { }
 
-        constexpr refcount_object& operator=(refcount_object&& other) noexcept {
+        constexpr object& operator=(object&& other) noexcept {
             _s = std::exchange(other._s, nullptr);
 
             return *this;
         }
 
         // Decrease refcount and possibly free memory
-        ~refcount_object() {
+        ~object() {
+            if (!_s) {
+                return;
+            }
+
             _s->count -= 1;
 
             if (_s->count == 0) {
@@ -71,13 +77,13 @@ namespace gc {
 
         // Compare
         [[nodiscard]] constexpr friend std::strong_ordering operator<=>(
-            const refcount_object& lhs, const refcount_object& rhs) {
+            const object& lhs, const object& rhs) {
 
             return lhs._s <=> &rhs._s;
         }
 
         [[nodiscard]] constexpr friend bool operator==(
-            const refcount_object& lhs, const refcount_object& rhs) {
+            const object& lhs, const object& rhs) {
 
             return lhs._s == rhs._s;
         }
@@ -87,20 +93,13 @@ namespace gc {
         }
     };
 
-    // Use a class instead of a namespace to allow the testing function to be templated
-    // TODO use allocator instead of new
-    class refcount {
-        public:
-        // Only allow use of the static functions
-        refcount() = delete;
-        refcount(const refcount&) = delete;
-        refcount(refcount&&) = delete;
-
+    // Allocator interface
+    struct allocator {
         template <std::destructible T, typename... Args>
-        [[nodiscard]] static constexpr refcount_object<T> allocate(Args&&... args) {
+        [[nodiscard]] constexpr object<T> allocate(Args&&... args) {
             return {
-                new typename refcount_object<T>::storage{
-                    1, { std::forward<Args>(args)... }
+                new typename object<T>::storage{
+                    1, T(std::forward<Args>(args)...)
                 }
             };
         }
