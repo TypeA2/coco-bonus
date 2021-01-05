@@ -76,6 +76,12 @@ namespace gc {
             return lhs._s <=> &rhs._s;
         }
 
+        [[nodiscard]] constexpr friend bool operator==(
+            const refcount_object& lhs, const refcount_object& rhs) {
+
+            return lhs._s == rhs._s;
+        }
+
         [[nodiscard]] constexpr explicit operator bool() const {
             return _s;
         }
