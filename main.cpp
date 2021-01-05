@@ -1,11 +1,12 @@
-﻿// bonus.cpp : Defines the entry point for the application.
-//
+﻿#include "refcount.h"
 
 #include <iostream>
-using namespace std;
 
-int main()
-{
-	cout << "Hello CMake." << endl;
+int main() {
+	auto s = gc::refcount::allocate<std::string>("foo");
+
+	std::cout << '[' << s->size() << "] " << *s << " at " << s.get()
+		<< " (valid: " << static_cast<bool>(s) << ")\n";
+	
 	return 0;
 }

@@ -2,6 +2,6 @@
 
 project("coco-bonus")
 
-add_executable(coco-bonus "main.cpp")
+add_executable(coco-bonus "main.cpp" "refcount.h")
 
 set_property(TARGET coco-bonus PROPERTY CXX_STANDARD 20)
