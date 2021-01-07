@@ -2,6 +2,7 @@
 #define REFCOUNT_H
 
 #include <utility>
+#include <ostream>
 
 // Reference counting GC "algorithm"
 namespace gc::refcount {
@@ -91,10 +92,17 @@ namespace gc::refcount {
         [[nodiscard]] constexpr explicit operator bool() const {
             return _s;
         }
+
+        friend std::ostream& operator<<(std::ostream& os, const object& o) {
+            return os << *o;
+        }
     };
 
     // Allocator interface
     struct allocator {
+        template <std::destructible T>
+        using object_type = object<T>;
+
         template <std::destructible T, typename... Args>
         [[nodiscard]] constexpr object<T> allocate(Args&&... args) {
             return {
@@ -105,5 +113,6 @@ namespace gc::refcount {
         }
     };
 }
+
 
 #endif /* REFCOUNT_H */

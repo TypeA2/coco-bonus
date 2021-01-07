@@ -1,6 +1,7 @@
 ﻿#include "refcount.h"
 
 #include <iostream>
+#include <array>
 
 #ifdef _MSC_VER
 // MSVC typeid(T).name() is unmangled
@@ -35,6 +36,35 @@ namespace test {
 			std::cout << "    [helper object] Destructor called, v = " << value << '\n';
 		}
 	};
+
+	template <typename T1, typename T2, typename T3>
+	struct helper2 {
+		T1 v1;
+		T2 v2;
+		T3 v3;
+
+		helper2(T1 t1, T2 t2, T3 t3) : v1{ std::move(t1) }, v2{ std::move(t2) }, v3 { std::move(t3) } {
+			std::cout << "    [helper2 object] Constructor called with:\n"
+				"        " << v1 << "\n"
+				"        " << v2 << "\n"
+				"        " << v3 << '\n';
+		}
+
+		~helper2() {
+			std::cout << "    [helper2 object] Destructor called with: \n"
+				"        " << v1 << "\n"
+				"        " << v2 << "\n"
+				"        " << v3 << '\n';
+		}
+	};
+}
+
+template <typename T, size_t N> requires std::integral<T> || std::floating_point<T>
+std::ostream& operator<<(std::ostream& os, const std::array<T, N>& arr) {
+	std::ostream_iterator<T> out(os, ", ");
+	std::copy_n(arr.begin(), arr.size(), out);
+
+	return os;
 }
 
 template <typename T>
@@ -104,6 +134,28 @@ bool test_allocator() {
 			ident(1) << "Deleting\n";
 		}
 
+		ident() << "\n";
+
+		{
+			ident(1) << "Creating a struct with multiple, nested members\n";
+
+			using int_field = typename T::template object_type<int>;
+			using string_field = typename T::template object_type<std::string>;
+			using float_field = typename T::template object_type<std::array<float, 8>>;
+			using struct_t = test::helper2<int_field, string_field, float_field>;
+
+			auto s = alloc.template allocate<struct_t>(
+				alloc.template allocate<int>(45),
+				alloc.template allocate<std::string>("foo"),
+
+				// Not a very clean interface...
+				alloc.template allocate<std::array<float, 8>>(
+					std::array<float, 8> { 1.f, 1.f, 2.f, 3.f, 5.f, 8.f, 13.f, 21.f })
+				);
+
+			ident(1) << "Deallocating said struct.\n";
+		}
+
 	} catch (std::exception& e) {
 		log() << "Exception caught: " << e.what() << '\n';
 		return false;
@@ -119,6 +171,6 @@ int main() {
 	if (!test_allocator<gc::refcount::allocator>()) {
 		success = false;
 	}
-	
+
 	return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
