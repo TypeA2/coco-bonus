@@ -1,4 +1,5 @@
 ﻿#include "refcount.h"
+#include "refcount_managed.h"
 
 #include <iostream>
 #include <array>
@@ -116,7 +117,7 @@ bool test_allocator() {
 		T alloc;
 
 		if constexpr (print) {
-			ident() << "Starting tests...\n";
+			ident() << '[' << allocator_name << "] Starting tests...\n";
 		}
 		
 		{
@@ -293,6 +294,10 @@ bool test_allocator() {
 			}
 		}
 
+		if constexpr (print) {
+			ident() << '\n';
+		}
+
 	} catch (std::exception& e) {
 		log() << "Exception caught: " << e.what() << '\n';
 		return false;
@@ -300,6 +305,8 @@ bool test_allocator() {
 
 	return true;
 }
+
+
 
 std::ostream& operator<<(std::ostream& os, const std::chrono::nanoseconds& ns) {
 	auto count = ns.count();
@@ -319,34 +326,47 @@ std::ostream& operator<<(std::ostream& os, const std::chrono::nanoseconds& ns) {
 	return os;
 }
 
+
+template <typename T, std::size_t runs, typename Clock>
+void benchmark_allocator() {
+	auto start = Clock::now();
+
+	for (size_t i = 0; i < runs; ++i) {
+		(void)test_allocator<T, false>();
+	}
+
+	auto end = Clock::now();
+
+	std::cout << '[' << type_name<T>() << "] " << (end - start) << '\n';
+}
+
+
 int main() {
 	bool success = true;
 
 	// Try all allocators
 	if (!test_allocator<gc::refcount::allocator, true>()) {
 		success = false;
+		
+		std::cout << "refcount failed!\n";
 	}
 
+	if (!test_allocator<gc::refcount_managed::allocator, true>()) {
+		success = false;
+
+		std::cout << "refcount_managed failed!\n";
+	}
 	
 
-	using clock = std::chrono::steady_clock;
+	using clock = std::chrono::high_resolution_clock;
 	constexpr size_t runs = 65535;
 	
 	std::cout <<
 		"\n\n======== Benchmarking... ========\n"
 		"    Iterations: " << runs << "\n\n";
 	
-	{
-		auto start = clock::now();
-
-		for (size_t i = 0; i < runs; ++i) {
-			(void) test_allocator<gc::refcount::allocator, false>();
-		}
-
-		auto end = clock::now();
-
-		std::cout << "[gc::refcount] " << (end - start) << '\n';;
-	}
+	benchmark_allocator<gc::refcount::allocator, runs, clock>();
+	benchmark_allocator<gc::refcount_managed::allocator, runs, clock>();
 
 	return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
