@@ -5,6 +5,7 @@
 #include <array>
 #include <string>
 #include <chrono>
+#include <numeric>
 
 #ifdef _MSC_VER
 // MSVC typeid(T).name() is unmangled
@@ -327,17 +328,40 @@ std::ostream& operator<<(std::ostream& os, const std::chrono::nanoseconds& ns) {
 }
 
 
-template <typename T, std::size_t runs, typename Clock>
+template <typename T, std::size_t runs, std::size_t repeats, typename Clock>
 void benchmark_allocator() {
-	auto start = Clock::now();
+	std::array<typename Clock::duration, repeats> durations;
 
-	for (size_t i = 0; i < runs; ++i) {
-		(void)test_allocator<T, false>();
+	auto cur = durations.begin();
+	
+	for (size_t j = 0; j < repeats; ++j) {
+		auto start = Clock::now();
+
+		for (size_t i = 0; i < runs; ++i) {
+			(void)test_allocator<T, false>();
+		}
+
+		auto end = Clock::now();
+
+		*cur++ = (end - start);
 	}
 
-	auto end = Clock::now();
+	auto total = std::accumulate(durations.begin(), durations.end(),
+		typename Clock::duration{});
 
-	std::cout << '[' << type_name<T>() << "] " << (end - start) << '\n';
+	auto mean = total / repeats;
+
+	auto sdev =
+		std::sqrt(std::accumulate(durations.begin(), durations.end(),
+			typename Clock::duration::rep{}, [mean_val = mean.count()](auto acc, auto v) {
+				auto diff = v.count() - mean_val;
+				return acc + diff * diff;
+			}) / static_cast<double>(repeats));
+
+	std::cout << '[' << type_name<T>() << "]:\n"
+		"    Mean: " << (total / repeats) << "\n"
+		"    SD:   " << typename Clock::duration{
+			static_cast<typename Clock::duration::rep>(sdev) } << "\n\n";
 }
 
 
@@ -359,14 +383,16 @@ int main() {
 	
 
 	using clock = std::chrono::high_resolution_clock;
-	constexpr size_t runs = 65535;
+	constexpr size_t runs = 16384;
+	constexpr size_t repeats = 256;
 	
 	std::cout <<
-		"\n\n======== Benchmarking... ========\n"
-		"    Iterations: " << runs << "\n\n";
+		"\n\n======== Benchmarking ========\n"
+		"    Iterations: " << runs << "\n"
+		"    Repeats:    " << repeats << "\n\n";
 	
-	benchmark_allocator<gc::refcount::allocator, runs, clock>();
-	benchmark_allocator<gc::refcount_managed::allocator, runs, clock>();
+	benchmark_allocator<gc::refcount::allocator, runs, repeats, clock>();
+	benchmark_allocator<gc::refcount_managed::allocator, runs, repeats, clock>();
 
 	return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
