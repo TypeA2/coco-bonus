@@ -329,8 +329,8 @@ std::ostream& operator<<(std::ostream& os, const std::chrono::nanoseconds& ns) {
 }
 
 
-template <typename T, std::size_t runs, std::size_t repeats, typename Clock>
-void benchmark_allocator() {
+template <typename T, std::size_t repeats, typename Clock>
+void benchmark_allocator(std::size_t runs) {
 	std::array<std::chrono::nanoseconds, repeats> durations;
 
 	auto cur = durations.begin();
@@ -359,10 +359,10 @@ void benchmark_allocator() {
 				return acc + diff * diff;
 			}) / static_cast<double>(repeats));
 
-	std::cout << '[' << type_name<T>() << "]:\n"
-		"    Mean: " << (total / repeats) << "\n"
-		"    SD:   " << std::chrono::nanoseconds(
-			static_cast<std::chrono::nanoseconds::rep>(sdev)) << "\n\n";
+	// Format readable by a script
+	std::cout << "!name=" << type_name<T>() << "\n"
+		"!mean=" << (total / repeats).count() << "\n"
+		"!sd=" << sdev << "\n\n";
 }
 
 
@@ -384,16 +384,22 @@ int main() {
 	
 
 	using clock = std::chrono::high_resolution_clock;
-	constexpr size_t runs = 16384;
 	constexpr size_t repeats = 256;
 	
 	std::cout <<
 		"\n\n======== Benchmarking ========\n"
-		"    Iterations: " << runs << "\n"
+		"    Iterations: 32 - 131072\n"
 		"    Repeats:    " << repeats << "\n\n";
-	
-	benchmark_allocator<gc::refcount::allocator, runs, repeats, clock>();
-	benchmark_allocator<gc::refcount_managed::allocator, runs, repeats, clock>();
+
+	for (std::size_t i = 32; i <= 65536; i *= 2) {
+		std::cout << "!iterations=" << i << '\n';
+		benchmark_allocator<gc::refcount::allocator, repeats, clock>(i);
+		benchmark_allocator<gc::refcount_managed::allocator, repeats, clock>(i);
+
+		// Force flush for program output
+		std::cout.flush();
+	}
+
 
 	return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }
