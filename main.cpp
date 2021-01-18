@@ -6,6 +6,7 @@
 #include <string>
 #include <chrono>
 #include <numeric>
+#include <cmath>
 
 #ifdef _MSC_VER
 // MSVC typeid(T).name() is unmangled
@@ -330,7 +331,7 @@ std::ostream& operator<<(std::ostream& os, const std::chrono::nanoseconds& ns) {
 
 template <typename T, std::size_t runs, std::size_t repeats, typename Clock>
 void benchmark_allocator() {
-	std::array<typename Clock::duration, repeats> durations;
+	std::array<std::chrono::nanoseconds, repeats> durations;
 
 	auto cur = durations.begin();
 	
@@ -343,25 +344,25 @@ void benchmark_allocator() {
 
 		auto end = Clock::now();
 
-		*cur++ = (end - start);
+		*cur++ = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
 	}
 
 	auto total = std::accumulate(durations.begin(), durations.end(),
-		typename Clock::duration{});
+		std::chrono::nanoseconds{ 0 });
 
 	auto mean = total / repeats;
 
 	auto sdev =
 		std::sqrt(std::accumulate(durations.begin(), durations.end(),
-			typename Clock::duration::rep{}, [mean_val = mean.count()](auto acc, auto v) {
+			std::chrono::nanoseconds::rep{}, [mean_val = mean.count()](auto acc, auto v) {
 				auto diff = v.count() - mean_val;
 				return acc + diff * diff;
 			}) / static_cast<double>(repeats));
 
 	std::cout << '[' << type_name<T>() << "]:\n"
 		"    Mean: " << (total / repeats) << "\n"
-		"    SD:   " << typename Clock::duration{
-			static_cast<typename Clock::duration::rep>(sdev) } << "\n\n";
+		"    SD:   " << std::chrono::nanoseconds(
+			static_cast<std::chrono::nanoseconds::rep>(sdev)) << "\n\n";
 }
 
 

@@ -4,12 +4,14 @@
 #include <utility>
 #include <ostream>
 #include <unordered_map>
+#include <map>
 
 // Reference counting GC with a global registry
 
 namespace gc::refcount_managed {
     class registry {
-        using reg_type = std::unordered_map<void*, std::size_t>;
+        // map seems to be faster than unordered_map
+        using reg_type = std::map<void*, std::size_t>;
 
         // Holds the registry itself
         static reg_type& _registry() {
