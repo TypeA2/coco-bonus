@@ -3,6 +3,8 @@
 import sys
 import os
 import json
+import matplotlib
+import matplotlib.axes
 import matplotlib.pyplot as plt
 
 assert len(sys.argv) == 4, "Must supply data file paths and output path"
@@ -17,6 +19,11 @@ outfile = sys.argv[3]
 assert outfile and not os.path.isfile(outfile), \
     f"Output file {outfile} must not exist"
 
+avg_plot: matplotlib.axes.Axes
+sd_plot: matplotlib.axes.Axes
+fig, (avg_plot, sd_plot) = plt.subplots(2, 1)
+
+iterations = None
 for df in datafiles:
     data = None
     with open(df, "r") as f:
@@ -49,3 +56,35 @@ for df in datafiles:
 
         print("\\\\")
         i *= 2
+
+    for a, results in data.items():
+        averages = []
+        sdevs = []
+
+        for avg, sd in results.values():
+            averages.append(avg)
+            sdevs.append(sd)
+
+        avg_plot.plot(iterations, averages, label=f"{df.split('.')[0]} - {a}")
+        sd_plot.plot(iterations, sdevs, label=f"{df.split('.')[0]} - {a}")
+
+
+def setup_plot(p: matplotlib.axes.Axes, title: str):
+    p.set_xlabel("# of iterations")
+    p.set_xscale("log", base=2)
+    p.set_xticks(iterations)
+    
+    p.set_ylabel("Duration (ns)")
+    p.set_xlim((iterations[0], iterations[-1]))
+
+    p.legend()
+    p.grid()
+
+    p.set_title(title)
+
+setup_plot(avg_plot, "Average duration")
+setup_plot(sd_plot, "Standard deviation")
+
+plt.subplots_adjust(hspace=0.35)
+
+plt.show()
